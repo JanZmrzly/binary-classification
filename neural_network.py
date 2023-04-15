@@ -1,3 +1,4 @@
+import datetime
 import tensorflow as tf
 import pandas as pd
 import numpy as np
@@ -7,6 +8,7 @@ class NeuralNetwork():
     def __init__(self):
         self.data_path = None
         self.df = None
+        self.data_prepared = False
         
         self.target = "class"
         self.train_df = None
@@ -18,6 +20,7 @@ class NeuralNetwork():
 
         self.model = None
         self.history = None
+        self.model_trained = False
 
     def load_data(self, data_path) -> tuple[str, bool]:
         self.data_path = data_path
@@ -55,6 +58,7 @@ class NeuralNetwork():
         buffer = 50
         self.train_dataset = self.prepare_dataset(self.train_data, self.train_labels, batch_size, buffer)
         self.valid_dataset = self.prepare_dataset(self.valid_data, self.valid_labels, batch_size, buffer)
+        self.data_prepared = True
 
     # Converting numpy to tf dataset
     def prepare_dataset(self, data, label, batch, shuffle_buffer):
@@ -64,7 +68,8 @@ class NeuralNetwork():
         return dataset
     
     def build_model(self, layers:list[tuple[int,str]]):
-        self.prepare_data()
+        if self.data_prepared is False:
+            self.prepare_data()
         # Building model
         self.model = tf.keras.Sequential()
         for layer in layers:
@@ -83,11 +88,22 @@ class NeuralNetwork():
                 self.train_dataset,
                 epochs=epochs,
                 validation_data = self.valid_dataset,
+                verbose=0
             )
+            self.model_trained = True
+    
+    def save_model(self, path):
+        dt = datetime.datetime.now()
+        time = dt.strftime('%Y%m%d_%H%M')
+        if self.history:
+            self.model.save(f"{path}{time}_Model")
+
+    def load_model(self, path):
+            self.model = tf.keras.models.load_model(path)
 
 if __name__ == "__main__":
     nn = NeuralNetwork()
-    epochs = 1000
+    epochs = 10
     layers = [
         (11, "relu"),
         (512, "relu"),

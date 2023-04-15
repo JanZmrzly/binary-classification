@@ -1,12 +1,14 @@
 import sys
+import os
+import qdarkgraystyle
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 matplotlib.use('Qt5Agg')
+plt.style.use("fivethirtyeight")
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from prettytable import PrettyTable
 
 from neural_network import NeuralNetwork
 
@@ -24,22 +26,54 @@ class OpenCsv(QtWidgets.QWidget):
 
         # Set layout
         layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.label)
         layout.addWidget(self.upload_button)
+        self.setFixedHeight(60)
         self.setLayout(layout)
 
     def upload_data(self):
         self.file_dialog = QtWidgets.QFileDialog(self)
-        self.file_dialog.setNameFilter("CSV Files (*.csv)")
         data_path, _ = self.file_dialog.getOpenFileName(self, caption="Open CSV file", filter="CSV Files (*.csv)")
         _,self.data_loaded = NET.load_data(data_path)
         self.disp_data.emit(self.data_loaded)
+
+class ModelOperations(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.label_load = QtWidgets.QLabel("Load trained model")
+        self.load_button = QtWidgets.QPushButton("Load")
+        self.label_save = QtWidgets.QLabel("Save trained model")
+        self.save_button = QtWidgets.QPushButton("Save")   
+        self.load_button.clicked.connect(self.load)
+        self.save_button.clicked.connect(self.save)
+
+        # Set layout
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.label_load)
+        layout.addWidget(self.load_button)
+        layout.addWidget(self.label_save)
+        layout.addWidget(self.save_button)
+
+        self.setFixedHeight(120)
+        self.setLayout(layout)
+
+    def load(self):
+        self.file_dialog = QtWidgets.QFileDialog(self)
+        path, _ = self.file_dialog.getOpenFileName(self, caption="Open Neural Network Model", filter="Neural Network (*.h5)")
+        print(path)
+        NET.load_model(path)
+
+    def save(self):
+        dir_name = "models"
+        os.makedirs(dir_name, exist_ok=True)
+        path = f"{os.path.abspath(dir_name)}\\".encode("cp1250")
+        NET.save_model(path)
 
 class DataFramePreview(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.label = QtWidgets.QLabel("Uploaded data preview")
         self.table = QtWidgets.QTableWidget()
-        # self.table.setMinimumSize(500,200)
         self.table.setMinimumWidth(500)
         self.table.setFixedHeight(150)
 
@@ -48,6 +82,7 @@ class DataFramePreview(QtWidgets.QWidget):
         layout.addWidget(self.label)
         layout.addWidget(self.table)
         
+        self.setFixedHeight(170)
         self.setLayout(layout)
     
     @QtCore.pyqtSlot(bool)
@@ -83,12 +118,14 @@ class ModelLayer(QtWidgets.QWidget):
 
         # Set layout
         layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0,3,0,0)
         layout.addWidget(self.neurons)
         layout.addWidget(self.activation)
         self.setLayout(layout)
 
 class ModelConfiguration(QtWidgets.QWidget):
+    plot_history = QtCore.pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.layers = []
@@ -97,6 +134,12 @@ class ModelConfiguration(QtWidgets.QWidget):
         self.add.clicked.connect(self.add_layer)
         self.remove = QtWidgets.QPushButton("Remove layer")
         self.remove.clicked.connect(self.remove_layer)
+        self.train = QtWidgets.QPushButton("Train model")
+        self.train.clicked.connect(self.train_model)
+        self.epochs = QtWidgets.QSpinBox()
+        self.epochs.setRange(1,1000)
+        self.epochs.setToolTip("Number of training epochs")
+        self.epochs.setValue(10)
 
         #Scroll Area Properties
         self.scroll_widget = QtWidgets.QWidget()
@@ -109,6 +152,8 @@ class ModelConfiguration(QtWidgets.QWidget):
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.addWidget(self.add)
         btn_layout.addWidget(self.remove)
+        btn_layout.addWidget(self.epochs)
+        btn_layout.addWidget(self.train)
 
         # Set layout
         self.layer_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
@@ -119,6 +164,8 @@ class ModelConfiguration(QtWidgets.QWidget):
         layout.addWidget(self.label)
         layout.addLayout(btn_layout)
         layout.addWidget(self.scroll_area)
+
+        self.setFixedHeight(200)
         self.setLayout(layout)
     
     def set_default_layers(self):
@@ -153,40 +200,61 @@ class ModelConfiguration(QtWidgets.QWidget):
             l = self.layers.pop()
             self.layer_layout.removeWidget(l)
             l.deleteLater()
+    
+    def train_model(self):
+        epochs = self.epochs.value()
+        layers:list[tuple[int,str]] = []
+        if self.layers != []:
+            for layer in self.layers:
+                activation = layer.activation.currentText()
+                neurons = layer.neurons.value()
+                layers.append((neurons, activation))
+
+            if NET.df is not None:
+                NET.build_model(layers)
+                NET.compile_model(epochs)
+                self.plot_history.emit()
+            else:
+                pass
+                # [TODO]: Need To upload dataset
 
 class Plot(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.initUI()
-
-    def initUI(self):
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.canvas)
         self.setLayout(layout)
-    
-    def plot_data(self, results, items_length):
-        items_length = np.array(items_length)
-        
-        results = [result[1] for result in results]
-        result_matrix = np.array(results)*np.array(items_length)
-        results = result_matrix.T
 
-        names = list(range(results.shape[1]))
-        width = 0.5
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        left = np.zeros(results.shape[1])
-        for pattern in results:
-            ax.barh(names, pattern, width, left=left)
-            left += pattern
-        
-        ax.set_xlabel('Length')
-        ax.set_title("Patterns")
-        ax.legend(items_length)
-        self.canvas.draw()
+    @QtCore.pyqtSlot()
+    def plot_history(self):
+        if NET.model_trained:
+            self.figure.clear()
+            
+            # Plotting Metrics Curve
+            plots = [(311,'accuracy'), (312, 'mae'), (313, 'loss')]
+            for plot in plots:
+                pos, mplt = plot
+                metric = NET.history.history[mplt]
+                val_metric = NET.history.history[f"val_{mplt}"]
+                epochs = range(len(metric))
+                plt.subplot(pos)         
+                plt.plot(epochs, metric, label=f"Training {mplt}")
+                plt.plot(epochs, val_metric, label=f"Validation {mplt}")
+                plt.legend(fontsize=6)
+                plt.title(f"Training and Validation for {mplt}", fontsize=8)
+                plt.tick_params(axis="both", labelsize=6)
+                plt.tight_layout(pad=1)
+            self.canvas.draw()
+
+class Empty(QtWidgets.QWidget):
+       def __init__(self):
+        super().__init__()
+
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
 
 class Results(QtWidgets.QWidget):
     def __init__(self):
@@ -219,25 +287,27 @@ class UiWindow(QtWidgets.QWidget):
         self.setWindowTitle("Binary Classification")
 
         self.csv_open = OpenCsv()
+        self.model_operations = ModelOperations()
         self.data_preview = DataFramePreview()
-        self.data_preview.setMaximumHeight(300)
+        
         self.csv_open.disp_data.connect(self.data_preview.disp_data)
+        self.empty = Empty()
         self.model_configuration = ModelConfiguration()
-        self.calculate_button = QtWidgets.QPushButton("Calculate")
-        self.calculate_button.clicked.connect(self.calculate)      
         
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self.csv_open)
+        left_layout.addWidget(self.model_operations)
         left_layout.addWidget(self.data_preview)
         left_layout.addWidget(self.model_configuration)
-        left_layout.addWidget(self.calculate_button)
+        left_layout.addWidget(self.empty)
     
         self.plot = Plot()
+        self.model_configuration.plot_history.connect(self.plot.plot_history)
         self.results = Results()
 
         right_layout = QtWidgets.QVBoxLayout()
         right_layout.addWidget(self.plot)
-        right_layout.addWidget(self.results)
+        # right_layout.addWidget(self.results)
       
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(left_layout)
@@ -248,11 +318,9 @@ class UiWindow(QtWidgets.QWidget):
         icon = QtGui.QIcon("")
         self.setWindowIcon(icon)
 
-    def calculate(self):
-        pass
-
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
+    app.setStyleSheet(qdarkgraystyle.load_stylesheet())
     window = UiWindow()
     window.show()
     sys.exit(app.exec_())
