@@ -87,7 +87,7 @@ class NeuralNetwork():
 
 if __name__ == "__main__":
     nn = NeuralNetwork()
-    epochs = 30
+    epochs = 1000
     layers = [
         (11, "relu"),
         (512, "relu"),

@@ -41,7 +41,7 @@ class DataFramePreview(QtWidgets.QWidget):
         self.table = QtWidgets.QTableWidget()
         # self.table.setMinimumSize(500,200)
         self.table.setMinimumWidth(500)
-        self.table.setFixedHeight(250)
+        self.table.setFixedHeight(150)
 
         # Set layout
         layout = QtWidgets.QVBoxLayout()
@@ -74,8 +74,6 @@ class DataFramePreview(QtWidgets.QWidget):
 class ModelLayer(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.activation_label = QtWidgets.QLabel("Select activation")
-        self.neurons_label = QtWidgets.QLabel("Select the number of neurons")
         self.activation = QtWidgets.QComboBox()
         self.activation.addItem("relu")
         self.activation.addItem("sigmoid")
@@ -84,17 +82,10 @@ class ModelLayer(QtWidgets.QWidget):
         self.neurons.setRange(1, 512)
 
         # Set layout
-        left_layout = QtWidgets.QVBoxLayout()
-        left_layout.addWidget(self.neurons_label)
-        left_layout.addWidget(self.neurons)
-
-        right_layout = QtWidgets.QVBoxLayout()
-        right_layout.addWidget(self.activation_label)
-        right_layout.addWidget(self.activation)
-
         layout = QtWidgets.QHBoxLayout()
-        layout.addLayout(left_layout)
-        layout.addLayout(right_layout)
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.neurons)
+        layout.addWidget(self.activation)
         self.setLayout(layout)
 
 class ModelConfiguration(QtWidgets.QWidget):
@@ -107,17 +98,27 @@ class ModelConfiguration(QtWidgets.QWidget):
         self.remove = QtWidgets.QPushButton("Remove layer")
         self.remove.clicked.connect(self.remove_layer)
 
+        #Scroll Area Properties
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.addWidget(self.add)
         btn_layout.addWidget(self.remove)
 
         # Set layout
-        self.layer_layout = QtWidgets.QVBoxLayout()
+        self.layer_layout = QtWidgets.QVBoxLayout(self.scroll_widget)
+        self.layer_layout.setContentsMargins(10,10,0,0)
+        self.layer_layout.setSpacing(0)
         self.set_default_layers()
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.label)
         layout.addLayout(btn_layout)
-        layout.addLayout(self.layer_layout)
+        layout.addWidget(self.scroll_area)
         self.setLayout(layout)
     
     def set_default_layers(self):
@@ -148,7 +149,10 @@ class ModelConfiguration(QtWidgets.QWidget):
         self.layers.append(l)
     
     def remove_layer(self):
-        pass
+        if self.layers != []:
+            l = self.layers.pop()
+            self.layer_layout.removeWidget(l)
+            l.deleteLater()
 
 class Plot(QtWidgets.QWidget):
     def __init__(self):
