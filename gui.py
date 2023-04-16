@@ -14,6 +14,31 @@ from neural_network import NeuralNetwork
 
 NET = NeuralNetwork()
 
+class TrainingThread(QtCore.QThread):
+    epoch_changed = QtCore.pyqtSignal(int)
+
+    def __init__(self, progress_bar:QtWidgets.QProgressBar):
+        super().__init__()
+        self.value = 0
+        self.is_running = False
+        self.progress_bar = progress_bar
+
+    def run(self):
+        self.is_running = True
+        while self.is_running:
+            new_value = NET.progress
+            if new_value != self.value:
+                self.value = new_value
+                self.progress_bar.update_progress(self.value)
+                # self.epoch_changed.emit(self.value)
+            self.msleep(50)
+
+    def get_current_value(self):
+        pass
+
+    def stop(self):
+        self.is_running = False
+
 class OpenCsv(QtWidgets.QWidget):
     disp_data = QtCore.pyqtSignal(bool)
 
@@ -62,15 +87,14 @@ class ModelOperations(QtWidgets.QWidget):
 
     def load(self):
         self.file_dialog = QtWidgets.QFileDialog(self)
-        path, _ = self.file_dialog.getOpenFileName(self, caption="Open Neural Network Model", filter="Neural Network (*.h5)")
-        print(path)
+        path = self.file_dialog.getExistingDirectory(None, "Open Neural Network Model")
+        # path, _ = self.file_dialog.getOpenFileName(self, caption="Open Neural Network Model", filter="Neural Network (*.h5)")
         NET.load_model(path)
 
     def save(self):
         dir_name = "models"
         os.makedirs(dir_name, exist_ok=True)
         path = os.path.abspath(dir_name)
-        # path = f"{os.path.abspath(dir_name)}\\".encode("cp1250")
         NET.save_model(path)
 
 class DataFramePreview(QtWidgets.QWidget):
@@ -116,6 +140,12 @@ class ModelLayer(QtWidgets.QWidget):
         self.activation = QtWidgets.QComboBox()
         self.activation.addItem("relu")
         self.activation.addItem("sigmoid")
+        self.activation.addItem("linear")
+        self.activation.addItem("relu")
+        self.activation.addItem("tanh")
+        self.activation.addItem("elu")
+        self.activation.addItem("selu")
+        self.activation.addItem("swish")
 
         self.neurons = QtWidgets.QSpinBox()
         self.neurons.setRange(1, 512)
@@ -130,8 +160,9 @@ class ModelLayer(QtWidgets.QWidget):
 class ModelConfiguration(QtWidgets.QWidget):
     plot_history = QtCore.pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, mthread:QtCore.QThread):
         super().__init__()
+        self.mthread = mthread
         self.layers = []
         self.label = QtWidgets.QLabel("Configurate your neural network model")
         self.add = QtWidgets.QPushButton("Add layer")
@@ -206,6 +237,7 @@ class ModelConfiguration(QtWidgets.QWidget):
             l.deleteLater()
     
     def train_model(self):
+        self.mthread.start()
         epochs = self.epochs.value()
         layers:list[tuple[int,str]] = []
         if self.layers != []:
@@ -221,6 +253,28 @@ class ModelConfiguration(QtWidgets.QWidget):
             else:
                 pass
                 # [TODO]: Need To upload dataset
+        self.mthread.stop()
+
+class ProgressBar(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.label = QtWidgets.QLabel("Training progress")
+        self.progress_bar = QtWidgets.QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(NET.progress)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(10,0,10,0)
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress_bar)
+
+        self.setFixedHeight(50)
+        self.setLayout(layout)
+
+    # @QtCore.pyqtSlot(int)
+    def update_progress(self, progress):
+        self.progress_bar.setValue(progress)
 
 class Plot(QtWidgets.QWidget):
     def __init__(self):
@@ -253,36 +307,35 @@ class Plot(QtWidgets.QWidget):
                 plt.tight_layout(pad=1)
             self.canvas.draw()
 
+class Accurency(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.accurancy = NET.accuracy
+        self.label = QtWidgets.QLabel(f"Binary accuracy: {self.accurancy}")
+        get_accurancy = QtWidgets.QPushButton("Calculate")
+        get_accurancy.clicked.connect(self.current_accurancy)
+
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(10,10,0,0)
+        layout.addWidget(self.label)
+        layout.addWidget(get_accurancy)
+
+        self.setFixedHeight(55)
+        self.setLayout(layout)
+
+    def current_accurancy(self):
+        accurancy = NET.binary_accurancy()
+        self.accurancy = accurancy
+        if self.accurancy is not None:
+            self.label.setText(f"Binary accuracy: {accurancy:.3f}")
+
 class Empty(QtWidgets.QWidget):
        def __init__(self):
         super().__init__()
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
-
-class Results(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-        self.result_box = QtWidgets.QTextEdit(self)
-        self.result_box.setMinimumSize(300,270)
-        self.result_box.setMaximumSize(400,300)
-        self.result_box.setReadOnly(True)
-        self.result_box.setLineWrapColumnOrWidth(1000) #Here you set the width you want
-        self.result_box.setLineWrapMode(QtWidgets.QTextEdit.LineWrapMode.FixedPixelWidth)
-        self.result_box.setPlainText("The results will be displayed here")
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.result_box)
-        self.setLayout(layout)
-        
-    def print_results(self, semiproduct_count, results, items_length):
-        self.result_box.clear()
-        self.result_box.insertPlainText("Best solution found\n\n")
-        self.result_box.insertPlainText(f"""{semiproduct_count} pieces of the default length will be needed for production\n\n""")
-        self.print_table(results, items_length)
-
-    def print_table(self, result):
-        self.result_box.insertPlainText(f"{result}")     
        
 class UiWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -296,7 +349,10 @@ class UiWindow(QtWidgets.QWidget):
         
         self.csv_open.disp_data.connect(self.data_preview.disp_data)
         self.empty = Empty()
-        self.model_configuration = ModelConfiguration()
+
+        self.progress_bar = ProgressBar()
+        self.mthread = TrainingThread(self.progress_bar)
+        self.model_configuration = ModelConfiguration(self.mthread)
         
         left_layout = QtWidgets.QVBoxLayout()
         left_layout.addWidget(self.csv_open)
@@ -305,13 +361,15 @@ class UiWindow(QtWidgets.QWidget):
         left_layout.addWidget(self.model_configuration)
         left_layout.addWidget(self.empty)
     
+        # self.mthread.epoch_changed.connect(self.progress_bar.update_progress)
         self.plot = Plot()
         self.model_configuration.plot_history.connect(self.plot.plot_history)
-        self.results = Results()
+        self.accurancy = Accurency()
 
         right_layout = QtWidgets.QVBoxLayout()
+        right_layout.addWidget(self.progress_bar)
         right_layout.addWidget(self.plot)
-        # right_layout.addWidget(self.results)
+        right_layout.addWidget(self.accurancy)
       
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(left_layout)
@@ -319,7 +377,7 @@ class UiWindow(QtWidgets.QWidget):
         
         self.setLayout(main_layout)
 
-        icon = QtGui.QIcon("")
+        icon = QtGui.QIcon("static\icon.png")
         self.setWindowIcon(icon)
 
 if __name__ == "__main__":
