@@ -103,14 +103,13 @@ class DataFramePreview(QtWidgets.QWidget):
         self.label = QtWidgets.QLabel("Uploaded data preview")
         self.table = QtWidgets.QTableWidget()
         self.table.setMinimumWidth(500)
-        self.table.setFixedHeight(150)
 
         # Set layout
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.table)
         
-        self.setFixedHeight(170)
+        self.setFixedHeight(175)
         self.setLayout(layout)
     
     @QtCore.pyqtSlot(bool)
@@ -174,7 +173,7 @@ class ModelConfiguration(QtWidgets.QWidget):
         self.epochs = QtWidgets.QSpinBox()
         self.epochs.setRange(1,1000)
         self.epochs.setToolTip("Number of training epochs")
-        self.epochs.setValue(10)
+        self.epochs.setValue(200)
 
         #Scroll Area Properties
         self.scroll_widget = QtWidgets.QWidget()
