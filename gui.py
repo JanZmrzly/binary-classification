@@ -26,9 +26,11 @@ class OpenCsv(QtWidgets.QWidget):
 
         # Set layout
         layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(10,0,0,0)
         layout.addWidget(self.label)
         layout.addWidget(self.upload_button)
-        self.setFixedHeight(60)
+        
+        self.setFixedHeight(55)
         self.setLayout(layout)
 
     def upload_data(self):
@@ -49,6 +51,7 @@ class ModelOperations(QtWidgets.QWidget):
 
         # Set layout
         layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(10,0,0,0)
         layout.addWidget(self.label_load)
         layout.addWidget(self.load_button)
         layout.addWidget(self.label_save)
@@ -66,7 +69,8 @@ class ModelOperations(QtWidgets.QWidget):
     def save(self):
         dir_name = "models"
         os.makedirs(dir_name, exist_ok=True)
-        path = f"{os.path.abspath(dir_name)}\\".encode("cp1250")
+        path = os.path.abspath(dir_name)
+        # path = f"{os.path.abspath(dir_name)}\\".encode("cp1250")
         NET.save_model(path)
 
 class DataFramePreview(QtWidgets.QWidget):

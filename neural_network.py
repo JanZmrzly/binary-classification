@@ -96,7 +96,7 @@ class NeuralNetwork():
         dt = datetime.datetime.now()
         time = dt.strftime('%Y%m%d_%H%M')
         if self.history:
-            self.model.save(f"{path}{time}_Model")
+            self.model.save(f"{path}/{time}_Model")
 
     def load_model(self, path):
             self.model = tf.keras.models.load_model(path)
