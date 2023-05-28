@@ -104,9 +104,9 @@ class NeuralNetwork():
             self.model_trained = True
    
     def binary_accurancy(self):
-        if self.df is not None and self.data_prepared is False:
+        if self.df is not None and self.data_prepared is False and self.df is not None:
             self.prepare_data()
-        if self.model is not None:
+        if self.model is not None and self.df is not None:
             ba = tf.keras.metrics.BinaryAccuracy()
             evaluate_data = self.train_dataset.concatenate(self.valid_dataset)
             y_test = evaluate_data.map(lambda x, y: y)
